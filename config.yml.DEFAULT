@@ -1,0 +1,16 @@
+
+# Set to true to enable debugging output
+debug: false
+
+# Location where Valheim is installed, used to sync mods to your game client for testing
+gamedir: '/home/user/.steam/steamapps/common/Valheim/'
+
+# Set the prefix for mod package ZIP files (will create {exportprefix}-{datestring}.zip)
+exportprefix: 'Valheim-Mods'
+
+# Set this to the directory to export packages to, (useful if you're using a sync application like NextCloud)
+exportdir: 'exports'
+
+# Set the number of days for "updated" packages, setting this to '14' will export any
+# plugin updated in the last 14 days in the "updated" package export
+updatedays: 14

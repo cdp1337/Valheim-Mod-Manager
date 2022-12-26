@@ -2,12 +2,17 @@
 
 ## Overview
 
-This is a script to assist with packaging mods from Thunderstore.io into a zip file for users on private servers (so they don't have to hunt down mods themselves).  It will also manage mods for your local game instance for testing prior to deployment.
+This is a script to assist with packaging mods from Thunderstore.io into a zip file for users on private servers so they don't have to hunt down mods themselves.  It will also manage mods for your local game instance for testing prior to deployment.
 
- <video width="1280" height="720" controls=true autoplay=true muted=true>
+![Application UI](screenshot-ui.png)
+
+![Resulting ZIP](screenshot-zip.png)
+
+<video width="1280" height="720" controls=true autoplay=true muted=true>
   <source src="Valheim-mod-manager-demo.webm" type="video/webm">
-  [Valheim mod manager demo video](Valheim-mod-manager-demo.webm)
 </video> 
+
+[Valheim mod manager demo video](Valheim-mod-manager-demo.webm)
 
 ## Requirements
 

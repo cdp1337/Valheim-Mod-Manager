@@ -14,6 +14,30 @@ from packaging import version
 
 
 class PackageVersion:
+    '''
+    Individual version for a given package, each package may have multiple versions,
+    any one of which may be installed (at a time)
+
+    Attributes
+    ----------
+    created : datetime
+        The datetime this version was published
+    dependencies : list[str]
+        List of dependencies
+    description : str
+        Description of this version
+    url : str
+        Download URL for this version
+    downloads : int
+        Number of downloads for this version
+    size : int
+        Filesize of this version (in bytes)
+    version : str
+        Version string of this version
+    uuid : str
+        Unique ID for this version
+    '''
+
     def __init__(self, data: dict) -> None:
         self.created: datetime = dateutil.parser.isoparse(data['date_created'])
         self.dependencies: list = data['dependencies']
@@ -26,6 +50,36 @@ class PackageVersion:
 
 
 class Package:
+    '''
+    A mod package from thunderstore.io, contains the bulk of the logic for working with mods.
+
+    Attributes
+    ----------
+    categories : list[str]
+        List of author-defined category tags
+    created : datetime
+        Date this mod was originally created
+    update : datetime
+        Date this mod was last updated
+    name : str
+        Name of this mod, also used to create the directory structure
+    deprecated : bool
+        If it's flagged as deprecated?  dunno
+    owner : str
+        Name of the author
+    url : str
+        URL on thunderstore.io to view this mod
+    uuid : str
+        Unique ID for this mod, useful because name is NOT unique!
+    rating : int
+        Rating score?  no idea what this is, but thunderstore.io provides it.
+    versions : list[PackageVersion]
+        List of all versions available for this mod
+    selected_version : str|None
+        Used when installing a specific version, set to the version string
+    installed_version : str|None
+        Set as the currently installed version string
+    '''
 
     overrides = {
         'BepInExPack_Valheim': {
@@ -52,6 +106,15 @@ class Package:
             self.versions.append(PackageVersion(i))
     
     def get_highest_version(self) -> PackageVersion:
+        '''
+        Get the latest version for this mod
+
+        Returns
+        -------
+        PackageVersion
+            The version object representing this request
+        '''
+
         highest_num = None
         highest_pkg = None
 
@@ -66,16 +129,46 @@ class Package:
         return highest_pkg
     
     def get_installed_version(self) -> PackageVersion:
+        '''
+        Get the currently installed version for this mod
+
+        Returns
+        -------
+        PackageVersion
+            The version object representing this request
+        '''
+
         for v in self.versions:
             if self.installed_version == v.version:
                 return v
     
     def get_version(self, vers: str) -> PackageVersion:
+        '''
+        Get a specific version for this mod based on its version string
+
+        Parameters
+        ----------
+        vers : str
+            Version string to retrieve
+
+        Returns
+        -------
+        PackageVersion
+            The version object representing this request
+        '''
         for v in self.versions:
             if v.version == vers:
                 return v
     
     def check_update_available(self) -> bool:
+        '''
+        Check if there is an update available for this mod
+
+        Returns
+        -------
+        bool
+            True/False if there's a newer version available in thunderstore.io
+        '''
         installed = self.get_installed_version()
         latest = self.get_highest_version()
 
@@ -86,6 +179,9 @@ class Package:
         return installed.version != latest.version
 
     def install(self):
+        '''
+        Install the `selected_version` of this mod into the local cache
+        '''
         if self.selected_version is not None:
             v = self.get_version(self.selected_version)
         else:
@@ -125,10 +221,16 @@ class Package:
         self.installed_version = v.version
 
     def upgrade(self):
+        '''
+        Convenience method to select the latest version and install that
+        '''
         self.selected_version = self.get_highest_version().version
         self.install()
     
     def remove(self):
+        '''
+        Remove this mod from the local cache
+        '''
         c = os.path.join('.cache/client/BepInEx/plugins/', self.name)
         s = os.path.join('.cache/server/BepInEx/plugins/', self.name)
 
@@ -144,6 +246,9 @@ class Package:
         self.installed_version = None
     
     def rollback(self):
+        '''
+        Rollback any modifications performed since the last deployment
+        '''
         try:
             changes = ModPackages.changed[self.uuid]
         except KeyError:
@@ -163,6 +268,13 @@ class Package:
     def _extract_zip(self, package: str, type: str):
         '''
         Internal method to extract a zip package into a given destination
+
+        Parameters
+        ----------
+        package : str
+            Local ZIP filename to extract, just the basename
+        type : str
+            Usually 'client' or 'server', allows the extract to target a specific destination type
         '''
         # Pull package overrides (if set)
         try:
@@ -221,6 +333,24 @@ class Package:
 
 
 class ModPackages(object):
+    '''
+    Primary interface for working with mods
+
+    Attributes
+    ----------
+    packages : list[Package]
+        List of all packages found from thunderstore.io
+    installed : dict
+        Dictionary of curently installed mods, keyed with the mod name.
+        Contains `uuid` (str), `version` (str), and `updated` (float)
+    removed : list[str]
+        Flat list of mod names removed since the last deployment, useful for keeping local game in sync with uninstalls
+    config : dict
+        Any configurable parameter within `config.yml`
+    changed : dict
+        Dictionary of changes pending for deployment, keyed with the mod UUID.
+        contains `old` and `new` with either the version string or None for new installs / removals.
+    '''
 
     _initialized = False
     packages: list[Package] = []
@@ -231,6 +361,11 @@ class ModPackages(object):
 
     @classmethod
     def init(cls) -> None:
+        '''
+        Initialize the mod system.
+
+        Will ensure the expected directory structure and load all necessary configuration parameters.
+        '''
         if cls._initialized:
             # init only needs ran once
             return
@@ -307,7 +442,7 @@ class ModPackages(object):
                 cls.packages.append(pkg)
     
     @classmethod
-    def download_packages(cls) -> None:
+    def download_packages(cls):
         '''
         Download the full list of all packages and store locally
         '''
@@ -320,10 +455,22 @@ class ModPackages(object):
     def search(cls, query: str) -> list[Package]:
         '''
         Search for packages by name, URL, or author-name-version
+
+        Parameters
+        ----------
+        query : str
+            Query to search against, can be:
+            "package name" for a simple search (usually from user input),
+            "package URL" useful for installing a specific mod after browsing the site, or
+            "author-name-version" dependency string
+        
+        Returns
+        -------
+        list[Package]
+            Any/all packages located from the search.  Try searching for "chicken", you'll get several.
         '''
         owner = None
         name = None
-        version = None
         url = None
 
         if re.match('([^-]*)-([^-]*)-([^-]*)', query) is not None:
@@ -359,6 +506,14 @@ class ModPackages(object):
     
     @classmethod
     def get_installed_packages(cls) -> list[Package]:
+        '''
+        Get all installed mods
+
+        Returns
+        -------
+        list[Package]
+            List of all mod packages currently installed
+        '''
         uuids = []
         for k in cls.installed:
             uuids.append(cls.installed[k]['uuid'])
@@ -367,12 +522,33 @@ class ModPackages(object):
     
     @classmethod
     def get_by_uuid(cls, uuid: str) -> Package:
+        '''
+        Get a specific mod package from its UUID
+
+        Returns
+        -------
+        Package
+            The mod package
+        '''
         for p in cls.packages:
             if p.uuid == uuid:
                 return p
     
     @classmethod
     def get_by_uuids(cls, uuids: list[str]) -> list[Package]:
+        '''
+        Get multiple mods by their UUIDs (useful for not iterating through the full packages unnecessarily)
+
+        Parameters
+        ----------
+        uuids : list[str]
+            List of UUID strings to retrieve
+        
+        Returns
+        -------
+        list[Package]
+            All packages with matching UUID string
+        '''
         packages = []
         for p in cls.packages:
             if p.uuid in uuids:
@@ -386,6 +562,13 @@ class ModPackages(object):
     def update_installed_cache(cls, pkg: Package, ver):
         '''
         Update the cache of packages installed
+
+        Parameters
+        ----------
+        pkg : Package
+            The package to flag as updated
+        ver : str|None
+            The version string (or None for removals) for the new version
         '''
 
         # Update changed for use in changelog and rolling back updates
@@ -461,6 +644,11 @@ class ModPackages(object):
     def get_synced_packages(cls) -> list[Package]:
         '''
         Get all packages which are installed in the local game client
+
+        Returns
+        -------
+        list[Package]
+            All mods currently installed in the local game directory
         '''
         packages = []
         d = os.path.join(cls.config['gamedir'], 'BepInEx', 'plugins')
@@ -504,7 +692,10 @@ class ModPackages(object):
         '''
         Export all installed mods into a single ZIP archive for players
 
-        @returns str Will return the filename generated
+        Returns
+        -------
+        str
+            Will return the filename generated
         '''
 
         srcdir = '.cache/client/'
@@ -523,7 +714,10 @@ class ModPackages(object):
         '''
         Export updated mods into a single ZIP archive for players
 
-        @returns str Will return the filename generated
+        Returns
+        -------
+        str
+            Will return the filename generated
         '''
 
         srcdir = '.cache/client/'
@@ -542,6 +736,14 @@ class ModPackages(object):
     
     @classmethod
     def export_changelog(cls) -> str:
+        '''
+        Export a list of changes in this deployment
+
+        Returns
+        -------
+        str
+            Will return the filename generated
+        '''
         installs = []
         updates = []
         removes = []
@@ -594,6 +796,14 @@ class ModPackages(object):
     
     @classmethod
     def export_modlist(cls) -> str:
+        '''
+        Export a list of all mods installed
+
+        Returns
+        -------
+        str
+            Will return the filename generated
+        '''
 
         mdtarget = os.path.join(cls.config['exportdir'], 'MODS.md')
         with open(mdtarget, 'w') as f:
@@ -605,6 +815,9 @@ class ModPackages(object):
 
     @classmethod
     def commit_changes(cls):
+        '''
+        Mark everything as deployed and remove the pending caches
+        '''
         if os.path.exists('.cache/changed.json'):
             os.remove('.cache/changed.json')
         

@@ -8,6 +8,26 @@ from pprint import pprint
 ModPackages.init()
 
 def _menu(title: str, options: list, quit: bool = False, clear: bool = False, back: bool = False, default = None):
+    '''
+    Render a menu for the user
+
+    Parameters
+    ----------
+    title : str
+        Title to display at the top of the menu
+    options : list
+        List of lists (option label, return value / return method)
+        If the second parameter of the selected option is a function, that function is called when selected.
+    quit : bool
+        Display a "quit" option to immediately exit the application
+    clear : bool
+        Clear the display prior to displaying the menu, useful for the main menu
+    back : bool
+        Display a "back" option, will return None when selected
+    default : str
+        Default option to use if the user simply presses 'Enter' without selecting anything
+        Note, this is what the user _would_ enter by default, so the 0th index will be '1'.
+    '''
     if clear:
         os.system('clear')
     
@@ -59,10 +79,16 @@ def _menu(title: str, options: list, quit: bool = False, clear: bool = False, ba
         
 
 def _wait():
+    '''
+    Just wait until the user presses enter, useful for displaying information
+    '''
     print('')
     input('Press ENTER to continue')
 
 def menu_main():
+    '''
+    Present the user with the main menu of this application
+    '''
     run = _menu(
         'Valheim Mod Manager',
         (
@@ -84,7 +110,10 @@ def menu_main():
 def check_environment():
     '''
     Check the environment on starting to allow the user to sync existing mods easily
+
+    Nothing is returned, but if the user selects the default option, `import_existing` will be executed
     '''
+
     print('Checking local game environment...')
     mods = []
     diff = False
@@ -121,6 +150,14 @@ def check_environment():
         )
 
 def list_installed() -> str:
+    '''
+    Display a list of currently installed mods
+
+    Returns
+    -------
+    str
+        'wait' is returned to indicate that the user needs to press 'Enter' to continue
+    '''
     print('Installed Mods')
     print('')
     changes = False
@@ -133,12 +170,16 @@ def list_installed() -> str:
     
     return 'wait'
 
-def sync_game() -> str:
-    print('Syncing game client...')
-    ModPackages.sync_game()
-    return 'wait'
-
 def install_new():
+    '''
+    Provide a UI to install a new mod from a search field
+
+    Returns
+    -------
+    str|None
+        'wait' is returned on changes to allow the user to see results,
+        or None if nothing performed
+    '''
     print('Install New Mod')
     print('')
     opt = input('Enter the mod name or URL to install (or ENTER to return): ')
@@ -194,6 +235,14 @@ def install_new():
         print('not installing')
 
 def export_package():
+    '''
+    Export all changes to ZIP files for deployment
+
+    Returns
+    -------
+    str
+        'wait' is returned to indicate that the user needs to press 'Enter' to continue
+    '''
     print('Exporting mod packages...')
     full = ModPackages.export_full()
     updates = ModPackages.export_updates()
@@ -210,6 +259,14 @@ def export_package():
     return 'wait'
 
 def check_updates() -> str:
+    '''
+    Check if mods have updates and provide the user with an option to install them
+
+    Returns
+    -------
+    str
+        'wait' is returned to indicate that the user needs to press 'Enter' to continue
+    '''
     print('Checking for updates...')
     print('')
     updates_available = False
@@ -249,6 +306,14 @@ def check_updates() -> str:
     return 'wait'
 
 def rollback() -> str:
+    '''
+    Revert / rollback pending changes prior to deployment, useful for borked mods
+
+    Returns
+    -------
+    str
+        'wait' is returned to indicate that the user needs to press 'Enter' to continue
+    '''
     print('Checking for changes...')
     print('')
     updates_available = False
@@ -305,6 +370,14 @@ def rollback() -> str:
     return 'wait'
 
 def remove() -> str:
+    '''
+    Provide a UI for the user to remove an installed mod
+
+    Returns
+    -------
+    str
+        'wait' is returned to indicate that the user needs to press 'Enter' to continue
+    '''
     pkgs = ModPackages.get_installed_packages()
     opts = []
     c = -1
@@ -323,6 +396,14 @@ def remove() -> str:
     return 'wait'
 
 def import_existing() -> str:
+    '''
+    Load all currently installed game mods into the manager, useful on first run and if a mod is manually installed
+
+    Returns
+    -------
+    str
+        'wait' is returned to indicate that the user needs to press 'Enter' to continue
+    '''
     print('Scanning for current packages...')
     packages = ModPackages.get_synced_packages()
 
@@ -368,27 +449,10 @@ def import_existing() -> str:
 
         return 'wait'
 
-# MaGic-Quick_Deposit-1.0.1
 
-#pprint(packages.packages[50].__dict__)
-#pprint(packages.packages[50].versions[0].__dict__)
-
-#pprint(packages.search('Quick_Deposit'))
-#pprint(packages.search('https://valheim.thunderstore.io/package/OdinPlus/BoomStick/')[0].__dict__)
-
-#p = ModPackages.search('https://valheim.thunderstore.io/package/OdinPlus/BoomStick/')[0]
-#for v in p.versions:
-#    pprint(v.__dict__)
-#p.install()
-
-#ModPackages.export_full()
-
-#ModPackages.export_updates()
-
-#pprint(ModPackages.packages[60].check_update_available())
-
-
+# Check if the user performed manual changes first (also useful on first run)
 check_environment()
 
+# Run the main menu until they quit.
 while True:
     menu_main()

@@ -9,6 +9,7 @@ import dateutil.parser
 import re
 import yaml
 import zipfile
+import magic
 from pprint import pprint
 from packaging import version
 
@@ -657,9 +658,20 @@ class ModPackages(object):
                 if f == 'manifest.json':
                     manifest = os.path.join(root, f)
                     logging.debug('Found ' + manifest)
-                    with open(manifest, 'r') as fp:
+                    m = magic.open(magic.MAGIC_MIME_ENCODING)
+                    m.load()
+                    with open(manifest, 'rb') as fp:
                         # Do this the hard way because manifests often contain UTF-8 characters
-                        data = json.loads(fp.read().encode().decode('utf-8-sig'))
+                        # Auto-detect encoding and read binary blob
+                        bin = fp.read()
+                        encoding = m.buffer(bin)
+                        
+                        if encoding != "utf-16le":
+                            data = json.loads(bin.decode("utf-8-sig"))
+                        else:
+                            bin = bin.decode("utf-16le").encode()
+                            data = json.loads(bin.decode("utf-8-sig"))
+                            
                         pkgs = cls.search(data['name'])
                         
                         if len(pkgs) == 0:

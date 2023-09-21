@@ -16,9 +16,9 @@ This is a script to assist with packaging mods from Thunderstore.io into a zip f
 
 ## Requirements
 
-`pip3 install packaging`
+`pip3 install packaging python-magic`
 
-Python3 and the packaging pip.  Tested on Ubuntu 22.04.
+Python3 and the [packaging, python-magic] packages.  Tested on Ubuntu 22.04.
 
 ## Configuration
 

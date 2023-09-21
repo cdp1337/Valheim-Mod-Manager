@@ -7,7 +7,8 @@ from pprint import pprint
 
 ModPackages.init()
 
-def _menu(title: str, options: list, quit: bool = False, clear: bool = False, back: bool = False, default = None):
+
+def _menu(title: str, options: list, quit: bool = False, clear: bool = False, back: bool = False, default=None):
     '''
     Render a menu for the user
 
@@ -30,23 +31,23 @@ def _menu(title: str, options: list, quit: bool = False, clear: bool = False, ba
     '''
     if clear:
         os.system('clear')
-    
+
     print(title + '\n')
-    
+
     space = math.floor(math.log10(len(options))) + 1
-    
+
     c = 0
     for i in options:
         c += 1
         s = space - math.floor(math.log10(c))
         print(str(c) + ':' + (' ' * s) + i[0])
-    
+
     if back:
         print('B: Go Back')
-    
+
     if quit:
         print('Q: Quit Application')
-    
+
     print('')
     opt = input('Enter 1-' + str(len(options)) + ': ')
 
@@ -56,27 +57,27 @@ def _menu(title: str, options: list, quit: bool = False, clear: bool = False, ba
     if quit and opt is not None and opt.lower() == 'q':
         print('Bye bye')
         exit()
-    
+
     if back and opt is not None and opt.lower() == 'b':
         return None
-    
+
     if clear:
         os.system('clear')
     else:
         print('')
-    
+
     c = 0
     sel = None
     for i in options:
         c += 1
         if opt == str(c):
             sel = i[1]
-    
+
     if hasattr(sel, '__call__'):
         return sel()
     else:
         return sel
-        
+
 
 def _wait():
     '''
@@ -84,6 +85,7 @@ def _wait():
     '''
     print('')
     input('Press ENTER to continue')
+
 
 def menu_main():
     '''
@@ -97,8 +99,8 @@ def menu_main():
             ('Check For Updates', check_updates),
             ('Uninstall Mod', remove),
             ('Revert Modifications', rollback),
-            #('Sync Game Mods       [Local Game]', sync_game),
-            #('Import Game Mods     [Local Game]', import_existing),
+            # ('Sync Game Mods       [Local Game]', sync_game),
+            # ('Import Game Mods     [Local Game]', import_existing),
             ('Export/Package Mods', export_package)
         ),
         quit=True, clear=True
@@ -107,12 +109,22 @@ def menu_main():
     if run == 'wait':
         _wait()
 
+
 def check_environment():
-    '''
+    """
     Check the environment on starting to allow the user to sync existing mods easily
 
     Nothing is returned, but if the user selects the default option, `import_existing` will be executed
-    '''
+    """
+
+    print('Checking manager environment...')
+    if not ModPackages.check_packages_fresh():
+        print('Thunderstore packages cache not fresh, downloading new copy...')
+        ModPackages.download_packages()
+
+    print('Loading manager...')
+    ModPackages.load_caches()
+
 
     print('Checking local game environment...')
     mods = []
@@ -127,27 +139,28 @@ def check_environment():
             # Mod installed, but versions differ
             print(pkg.name + ' ' + pkg.selected_version + ' found in game directory differs from registered version')
             diff = True
-        
+
         mods.append(pkg.name)
     local = ModPackages.get_installed_packages()
     for pkg in local:
         # Skip auto-generated system mods
         if pkg.name == 'BepInExPack_Valheim' or pkg.name == 'HookGenPatcher':
             continue
-            
+
         if pkg.name not in mods:
             print(pkg.name + ' registered but is not installed in game yet')
             diff = True
-    
+
     if diff:
         _menu(
             title='Changes detected',
             options=(
-                ('Sync changes', import_existing),
+                ('Sync changes', sync_existing),
                 ('Continue without syncing', 'skip')
             ),
             default='1'
         )
+
 
 def list_installed() -> str:
     '''
@@ -164,14 +177,16 @@ def list_installed() -> str:
     for pkg in ModPackages.get_installed_packages():
         print('* ' + pkg.name + ' ' + pkg.installed_version)
         changes = True
-    
+
     if not changes:
-        print('No mods are installed!  Try running "Import Game Mods" to import your existing mods or "Install New Mod" to start!')
-    
+        print(
+            'No mods are installed!  Try running "Import Game Mods" to import your existing mods or "Install New Mod" to start!')
+
     return 'wait'
 
+
 def install_new():
-    '''
+    """
     Provide a UI to install a new mod from a search field
 
     Returns
@@ -179,7 +194,7 @@ def install_new():
     str|None
         'wait' is returned on changes to allow the user to see results,
         or None if nothing performed
-    '''
+    """
     print('Install New Mod')
     print('')
     opt = input('Enter the mod name or URL to install (or ENTER to return): ')
@@ -206,16 +221,16 @@ def install_new():
             mod = opt
     else:
         mod = mods[0]
-    
+
     opts = []
     for v in mod.versions:
         opts.append((v.version + ' released ' + v.created.strftime('%Y-%m-%d'), v))
-    
+
     vers = _menu(title='Select Version (or ENTER to auto select newest)', options=opts, back=True, default='1')
 
     if vers is None:
         return
-    
+
     mod.selected_version = vers.version
     print('Installing ' + mod.name + ' v' + vers.version)
     print(vers.description)
@@ -225,14 +240,17 @@ def install_new():
         opt = input('ENTER to resume, CTRL+C to stop: ')
     except KeyboardInterrupt:
         opt = 'n'
-    
+
     if opt == '':
+        print('Installing mod...')
         mod.install()
+        print('Deploying to local game client...')
         ModPackages.sync_game()
         print('Mod installed')
         return 'wait'
     else:
         print('not installing')
+
 
 def export_package():
     '''
@@ -258,6 +276,7 @@ def export_package():
     print('Modlist:   ' + modlist)
     return 'wait'
 
+
 def check_updates() -> str:
     '''
     Check if mods have updates and provide the user with an option to install them
@@ -280,13 +299,13 @@ def check_updates() -> str:
         if updates:
             opts.append((pkg.name + ' ' + v1 + ' update available to ' + v2, pkg))
             updates_available = True
-    
+
     if not updates_available:
         print('No mod updates are available!')
         return 'wait'
-    
+
     opt = _menu(title='Select an update to perform or ENTER to update all', options=opts, default='1', back=True)
-    
+
     if opt is None:
         # User opted to not perform any updates
         return
@@ -304,6 +323,7 @@ def check_updates() -> str:
         print('Updated ' + opt.name)
 
     return 'wait'
+
 
 def rollback() -> str:
     '''
@@ -345,13 +365,14 @@ def rollback() -> str:
         except KeyError:
             # No changes recorded, nothing to perform
             pass
-    
+
     if not updates_available:
         print('No changes found')
         return 'wait'
-    
-    opt = _menu(title='Select an update to revert or ENTER to rollback everything', options=opts, default='1', back=True)
-    
+
+    opt = _menu(title='Select an update to revert or ENTER to rollback everything', options=opts, default='1',
+                back=True)
+
     if opt is None:
         # User opted to not perform any updates
         return
@@ -369,41 +390,57 @@ def rollback() -> str:
 
     return 'wait'
 
+
 def remove() -> str:
-    '''
+    """
     Provide a UI for the user to remove an installed mod
 
     Returns
     -------
     str
         'wait' is returned to indicate that the user needs to press 'Enter' to continue
-    '''
+    """
     pkgs = ModPackages.get_installed_packages()
     opts = []
     c = -1
     for pkg in pkgs:
         c += 1
         opts.append((pkg.name + ' ' + pkg.installed_version, c))
-    
+
+    if len(opts) == 0:
+        print('No mods installed, nothing to remove.')
+        return 'wait'
+
+    opts.append(('**REMOVE ALL MODS**', '_ALL_'))
+
     opt = _menu(title='Uninstalling Mod', options=opts, back=True, default='b')
 
     if opt is None:
         return
-    
-    pkgs[opt].remove()
+
+    if opt == '_ALL_':
+        for pkg in pkgs:
+            print('Removing mod ' + pkg.name + '...')
+            pkg.remove()
+    else:
+        print('Removing mod...')
+        pkgs[opt].remove()
+
+    print('Removing files from game client...')
     ModPackages.sync_game()
     print('Selected mod has been removed')
     return 'wait'
 
+
 def import_existing() -> str:
-    '''
+    """
     Load all currently installed game mods into the manager, useful on first run and if a mod is manually installed
 
     Returns
     -------
     str
         'wait' is returned to indicate that the user needs to press 'Enter' to continue
-    '''
+    """
     print('Scanning for current packages...')
     packages = ModPackages.get_synced_packages()
 
@@ -414,7 +451,7 @@ def import_existing() -> str:
             dupes.append(p.name)
         else:
             check.append(p.name)
-    
+
     if len(dupes) > 0:
         # The manifest doesn't contain all data to uniquely identify the source package,
         # and some authors will fork projects to publish under the same name.
@@ -436,18 +473,31 @@ def import_existing() -> str:
     print('')
     for p in packages:
         print('* ' + p.name + ' ' + p.selected_version)
-    
-    try:
-        opt = input('ENTER to load current mods, CTRL+C to stop: ')
-    except KeyboardInterrupt:
+
+    if len(packages) > 0:
+        try:
+            opt = input('ENTER to load current mods, CTRL+C to stop: ')
+        except KeyboardInterrupt:
+            opt = 'n'
+    else:
         opt = 'n'
-    
+
     if opt == '':
         for p in packages:
             print('Installing ' + p.name + ' ' + p.selected_version + '...')
             p.install()
 
         return 'wait'
+
+
+def sync_existing() -> str:
+    """
+    Import any existing game mod and push any registered mod
+    :return:
+    """
+    import_existing()
+    ModPackages.sync_game()
+    return ''
 
 
 # Check if the user performed manual changes first (also useful on first run)

@@ -2,9 +2,10 @@
 
 import math
 import os
+import re
 from typing import Union
 from requests import Timeout
-from manager import ModPackages
+from manager import ModPackages, Package
 
 ModPackages.init()
 
@@ -105,6 +106,7 @@ def menu_main():
             ('List Mods Installed', list_installed),
             ('Install New Mod', install_new),
             ('Check For Updates', check_updates),
+            ('List Mods Removed', list_removed),
             ('Uninstall Mod', remove),
             ('Revert Modifications', rollback),
             # ('Sync Game Mods       [Local Game]', sync_game),
@@ -176,27 +178,149 @@ def check_environment():
 
 def list_installed() -> str:
     """
-    Display a list of currently installed mods
+    List installed mods (and provide a UI to manage them)
+    :return: str
+    """
+    return _list_mods('installed')
+
+
+def list_removed() -> str:
+    """
+    List recently removed mods (and provide a UI to manage them)
+    :return: str
+    """
+    return _list_mods('removed')
+
+
+def _list_mods(mode: str) -> str:
+    """
+    Display a list of mods
 
     Returns
     -------
     str
         'wait' is returned to indicate that the user needs to press 'Enter' to continue
     """
-    print('Installed Mods')
-    print('')
-    changes = False
-    for pkg in ModPackages.get_installed_packages():
-        print('* ' + pkg.name + ' ' + pkg.installed_version)
-        changes = True
 
-    if not changes:
+    max_len = {
+        'name': 0,
+        'vers': 0,
+        'date': 0,
+        'author': 0
+    }
+
+    def print_row(row: dict):
         print(
-            'No mods are installed!  '
-            'Try running "Import Game Mods" to import your existing mods or "Install New Mod" to start!'
+            '| ' +
+            ' | '.join((
+                row['id'].rjust(2, ' '),
+                row['name'].ljust(max_len['name'], ' '),
+                row['version'].ljust(max_len['vers'], ' '),
+                row['date'].ljust(max_len['date'], ' '),
+                row['rating'].rjust(6, ' '),
+                row['author'].ljust(max_len['author'], ' ')
+            )) +
+            ' |'
         )
 
-    return 'wait'
+    def print_sep():
+        print(
+            '|-' +
+            '-|-'.join((
+                '-'.rjust(2, '-'),
+                '-'.ljust(max_len['name'], '-'),
+                '-'.ljust(max_len['vers'], '-'),
+                '-'.ljust(max_len['date'], '-'),
+                '-'.rjust(6, '-'),
+                '-'.ljust(max_len['author'], '-')
+            )) +
+            '-|'
+        )
+
+    sorting = 'n'
+    while True:
+        os.system('clear')
+
+        if mode == 'installed':
+            mods = ModPackages.get_installed_packages()
+        else:
+            mods = ModPackages.get_removed_packages()
+
+        if len(mods) == 0:
+            if mode == 'installed':
+                print(
+                    'No mods are installed!  '
+                    'Try running "Import Game Mods" to import your existing mods or "Install New Mod" to start!'
+                )
+            else:
+                print('No mods recently removed')
+            return 'wait'
+
+        max_len = {
+            'name': 8,
+            'vers': 7,
+            'date': 7,
+            'author': 6
+        }
+        for pkg in mods:
+            max_len['name'] = max(max_len['name'], len(pkg.name))
+            if pkg.installed_version is not None:
+                max_len['vers'] = max(max_len['vers'], len(pkg.installed_version))
+            max_len['date'] = max(max_len['date'], len(pkg.update.strftime('%Y-%m-%d')))
+            max_len['author'] = max(max_len['author'], len(pkg.owner))
+
+        if mode == 'installed':
+            print('Installed Mods')
+        else:
+            print('Removed Mods')
+        print('')
+
+        print_row({
+            'id': '#',
+            'name': 'Mod Name',
+            'version': 'Version',
+            'date': 'Updated',
+            'rating': 'Rating',
+            'author': 'Author'
+        })
+        print_sep()
+
+        if sorting == 'v':
+            mods = sorted(mods, key=lambda item: item.installed_version if item.installed_version is not None else '')
+        elif sorting == 'd':
+            mods = sorted(mods, key=lambda item: item.update)
+        elif sorting == 'r':
+            mods = sorted(mods, key=lambda item: item.rating)
+        elif sorting == 'a':
+            mods = sorted(mods, key=lambda item: item.owner)
+        else:
+            mods = sorted(mods, key=lambda item: item.name)
+
+        counter = 1
+        for pkg in mods:
+            print_row({
+                'id': str(counter),
+                'name': pkg.name,
+                'version': pkg.installed_version if pkg.installed_version is not None else 'N/A',
+                'date': pkg.update.strftime('%Y.%m.%d'),
+                'rating': str(pkg.rating),
+                'author': pkg.owner
+            })
+            counter += 1
+
+        print('')
+        print('Change sorting by entering [n]ame, [v]ersion, [d]ate, [r]ating, or [a]uthor,')
+        print('view or manage a mod with 1 - ' + str(counter-1) + ', or ENTER to return')
+        opt = input('(n, v, d, r, a, 1-' + str(counter-1) + '): ').lower()
+
+        if opt == '':
+            # Return to menu
+            return ''
+        elif re.match('^[0-9]*$', opt) is not None and counter > int(opt) > 0:
+            # Number, select a specific mod
+            _manage_mod(mods[int(opt)-1])
+        else:
+            sorting = opt
 
 
 def install_new():
@@ -520,6 +644,71 @@ def sync_existing() -> str:
     import_existing()
     ModPackages.sync_game()
     return ''
+
+
+def _manage_mod(mod: Package):
+    os.system('clear')
+    if mod.installed_version is not None:
+        print(mod.name + ' ' + mod.installed_version)
+    else:
+        print(mod.name)
+    print('')
+    if mod.check_update_available():
+        print('Status: Update Available!')
+    elif mod.installed_version is not None:
+        print('Status: Installed, Up to date')
+    else:
+        print('Status: Not installed')
+    print('Author: ' + mod.owner)
+    print('Updated: ' + mod.update.strftime('%Y-%m-%d'))
+    print('Rating: ' + str(mod.rating))
+    print('Categories: ' + ', '.join(mod.categories))
+    print('URL: ' + mod.url)
+    print('')
+    if mod.installed_version is not None:
+        print(mod.get_installed_version().description)
+    else:
+        print(mod.get_highest_version().description)
+
+    print('')
+    if mod.check_update_available():
+        options = ('r', 'u')
+        print('Actions: [r]emove, [u]pdate, or ENTER to return')
+    elif mod.installed_version is not None:
+        options = ('r',)
+        print('Actions: [r]emove or ENTER to return')
+    else:
+        options = ('i',)
+        print('Actions: [i]nstall for the latest version or ENTER to return')
+    opt = input('(' + ', '.join(options) + ', or ENTER): ').lower()
+
+    if opt == 'r' and opt in options:
+        print('Removing mod...')
+        mod.remove()
+
+        print('Removing files from game client...')
+        ModPackages.sync_game()
+
+        print('Selected mod has been removed')
+        _wait()
+    elif opt == 'u' and opt in options:
+        print('Updating mod...')
+        mod.upgrade()
+
+        print('Syncing game client...')
+        ModPackages.sync_game()
+
+        print('Updated ' + mod.name)
+        _wait()
+    elif opt == 'i' and opt in options:
+        print('Installing mod...')
+        mod.install()
+
+        print('Syncing game client...')
+        ModPackages.sync_game()
+
+        print('Mod installed')
+        _wait()
 
 
 # Check if the user performed manual changes first (also useful on first run)

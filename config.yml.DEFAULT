@@ -1,16 +1,47 @@
-
+## Debug Mode
 # Set to true to enable debugging output
 debug: false
 
+
+## Game Directory
 # Location where Valheim is installed, used to sync mods to your game client for testing
 gamedir: '/home/user/.steam/steamapps/common/Valheim/'
 
+
+## Export Filename (Prefix)
 # Set the prefix for mod package ZIP files (will create {exportprefix}-{datestring}.zip)
 exportprefix: 'Valheim-Mods'
 
+
+## Export Directory
 # Set this to the directory to export packages to, (useful if you're using a sync application like NextCloud)
 exportdir: 'exports'
 
+
+## "Update" Duration
 # Set the number of days for "updated" packages, setting this to '14' will export any
 # plugin updated in the last 14 days in the "updated" package export
 updatedays: 14
+
+
+## Dedicated Server IP/Hostname
+# Set to the IP or hostname to automatically deploy "server" plugins during export
+# if empty, this logic is skipped
+sftp_host: ''
+
+
+## Dedicated Server SSH Username
+# Username to connect with via SSH, (key-based authentication only)
+sftp_user: 'user'
+
+
+## Dedicated Server Path
+# Path on the dedicated server where Valheim is installed
+sftp_path: '/home/user/.steam/steamapps/common/Valheim dedicated server'
+
+
+## Override "Server" Tag
+# Comma-separated list of plugins to force server deployment
+# Usually only mods flagged with the "server" tag are deployed,
+# but sometimes mod developers don't include that.
+override_server: 'BepInExPack_Valheim, Jotunn'

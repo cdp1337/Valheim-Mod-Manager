@@ -10,7 +10,7 @@ import re
 import yaml
 import zipfile
 import magic
-from pprint import pprint
+import paramiko
 from packaging import version
 
 
@@ -213,7 +213,7 @@ class Package:
         
         # Extract the package (and optionally to server if set)
         self._extract_zip(target, 'client')
-        if 'Server-side' in self.categories:
+        if 'Server-side' in self.categories or self.name in ModPackages.config['override_server']:
             self._extract_zip(target, 'server')
         
         # Update the install cache
@@ -399,6 +399,11 @@ class ModPackages(object):
         if not os.path.exists(cls.config['exportdir']):
             os.makedirs(cls.config['exportdir'])
 
+        try:
+            cls.config['override_server'] = list(map(str.strip, cls.config['override_server'].split(',')))
+        except KeyError:
+            cls.config['override_server'] = []
+
     @classmethod
     def load_caches(cls):
         """
@@ -459,7 +464,7 @@ class ModPackages(object):
         """
         url = 'https://valheim.thunderstore.io/api/v1/package/'
         logging.debug('Downloading ' + url + ' to .cache/packages.json')
-        webreq = requests.get(url)
+        webreq = requests.get(url, timeout=15)
         open('.cache/packages.json', 'wb').write(webreq.content)
     
     @classmethod
@@ -848,6 +853,44 @@ class ModPackages(object):
                 f.write('* ' + pkg.name + ' ' + pkg.installed_version + '\n')
 
         return mdtarget
+
+    @classmethod
+    def export_server_sftp(cls):
+        with paramiko.SSHClient() as ssh:
+            ssh.load_system_host_keys()
+            ssh.connect(cls.config['sftp_host'], username=cls.config['sftp_user'])
+
+            sftp = ssh.open_sftp()
+
+            sftp.chdir(cls.config['sftp_path'])
+
+            srcdir = '.cache/server/'
+            for root, dirs, files in os.walk(srcdir):
+                for f in files:
+                    d = os.path.join(root, f)[len(srcdir):]
+                    p = os.path.dirname(d)
+                    logging.debug('Uploading ' + d)
+                    try:
+                        sftp.put(os.path.join(root, f), d)
+                    except FileNotFoundError:
+                        # Most common issue, directory does not exist yet.
+                        p2 = ''
+                        while p != '':
+                            try:
+                                p2 = os.path.join(p2, p[0:p.index('/')])
+                                p = p[p.index('/')+1:]
+                            except ValueError:
+                                p2 = os.path.join(p2, p)
+                                p = ''
+
+                            try:
+                                sftp.mkdir(p2)
+                                logging.debug('Auto created directory ' + p2)
+                            except IOError:
+                                pass
+                        # Perform the upload attempt again
+                        sftp.put(os.path.join(root, f), d)
+            sftp.close()
 
     @classmethod
     def commit_changes(cls):

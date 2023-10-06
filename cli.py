@@ -2,22 +2,30 @@
 
 import math
 import os
+from typing import Union
+from requests import Timeout
 from manager import ModPackages
-from pprint import pprint
 
 ModPackages.init()
 
 
-def _menu(title: str, options: list, quit: bool = False, clear: bool = False, back: bool = False, default=None):
-    '''
+def _menu(
+        title: str,
+        options: Union[tuple, list],
+        quit: bool = False,
+        clear: bool = False,
+        back: bool = False,
+        default=None
+):
+    """
     Render a menu for the user
 
     Parameters
     ----------
     title : str
         Title to display at the top of the menu
-    options : list
-        List of lists (option label, return value / return method)
+    options : list,tuple
+        List of menu options (option label, return value / return method)
         If the second parameter of the selected option is a function, that function is called when selected.
     quit : bool
         Display a "quit" option to immediately exit the application
@@ -28,7 +36,7 @@ def _menu(title: str, options: list, quit: bool = False, clear: bool = False, ba
     default : str
         Default option to use if the user simply presses 'Enter' without selecting anything
         Note, this is what the user _would_ enter by default, so the 0th index will be '1'.
-    '''
+    """
     if clear:
         os.system('clear')
 
@@ -80,17 +88,17 @@ def _menu(title: str, options: list, quit: bool = False, clear: bool = False, ba
 
 
 def _wait():
-    '''
+    """
     Just wait until the user presses enter, useful for displaying information
-    '''
+    """
     print('')
     input('Press ENTER to continue')
 
 
 def menu_main():
-    '''
+    """
     Present the user with the main menu of this application
-    '''
+    """
     run = _menu(
         'Valheim Mod Manager',
         (
@@ -120,11 +128,15 @@ def check_environment():
     print('Checking manager environment...')
     if not ModPackages.check_packages_fresh():
         print('Thunderstore packages cache not fresh, downloading new copy...')
-        ModPackages.download_packages()
+        try:
+            ModPackages.download_packages()
+        except ConnectionError:
+            print('Unable to connect to Thunderstore!  Please verify your internet connectivity.')
+        except Timeout:
+            print('Thunderstore took too long to respond, skipping package update')
 
     print('Loading manager...')
     ModPackages.load_caches()
-
 
     print('Checking local game environment...')
     mods = []
@@ -163,14 +175,14 @@ def check_environment():
 
 
 def list_installed() -> str:
-    '''
+    """
     Display a list of currently installed mods
 
     Returns
     -------
     str
         'wait' is returned to indicate that the user needs to press 'Enter' to continue
-    '''
+    """
     print('Installed Mods')
     print('')
     changes = False
@@ -180,7 +192,9 @@ def list_installed() -> str:
 
     if not changes:
         print(
-            'No mods are installed!  Try running "Import Game Mods" to import your existing mods or "Install New Mod" to start!')
+            'No mods are installed!  '
+            'Try running "Import Game Mods" to import your existing mods or "Install New Mod" to start!'
+        )
 
     return 'wait'
 
@@ -253,19 +267,28 @@ def install_new():
 
 
 def export_package():
-    '''
+    """
     Export all changes to ZIP files for deployment
 
     Returns
     -------
     str
         'wait' is returned to indicate that the user needs to press 'Enter' to continue
-    '''
+    """
     print('Exporting mod packages...')
     full = ModPackages.export_full()
     updates = ModPackages.export_updates()
     changelog = ModPackages.export_changelog()
     modlist = ModPackages.export_modlist()
+
+    try:
+        if ModPackages.config['sftp_host'] != '':
+            print('Uploading server packages to ' + ModPackages.config['sftp_host'] + '...')
+            ModPackages.export_server_sftp()
+        else:
+            print('No SFTP host set, skipping server upload')
+    except KeyError:
+        print('No SFTP host set, skipping server upload')
 
     ModPackages.commit_changes()
 
@@ -278,19 +301,18 @@ def export_package():
 
 
 def check_updates() -> str:
-    '''
+    """
     Check if mods have updates and provide the user with an option to install them
 
     Returns
     -------
     str
         'wait' is returned to indicate that the user needs to press 'Enter' to continue
-    '''
+    """
     print('Checking for updates...')
     print('')
     updates_available = False
-    opts = []
-    opts.append(('Install all updates', 'ALL'))
+    opts = [('Install all updates', 'ALL')]
     for pkg in ModPackages.get_installed_packages():
         updates = pkg.check_update_available()
         v1 = pkg.get_installed_version().version
@@ -308,7 +330,7 @@ def check_updates() -> str:
 
     if opt is None:
         # User opted to not perform any updates
-        return
+        return ''
     elif opt == 'ALL':
         # User opted to perform ALL updates
         for pkg in ModPackages.get_installed_packages():
@@ -326,14 +348,14 @@ def check_updates() -> str:
 
 
 def rollback() -> str:
-    '''
+    """
     Revert / rollback pending changes prior to deployment, useful for borked mods
 
     Returns
     -------
     str
         'wait' is returned to indicate that the user needs to press 'Enter' to continue
-    '''
+    """
     print('Checking for changes...')
     print('')
     updates_available = False
@@ -375,7 +397,7 @@ def rollback() -> str:
 
     if opt is None:
         # User opted to not perform any updates
-        return
+        return ''
     elif opt == 'ALL':
         # User opted to perform ALL updates
         for pkg in pkgs:
@@ -416,7 +438,7 @@ def remove() -> str:
     opt = _menu(title='Uninstalling Mod', options=opts, back=True, default='b')
 
     if opt is None:
-        return
+        return ''
 
     if opt == '_ALL_':
         for pkg in pkgs:

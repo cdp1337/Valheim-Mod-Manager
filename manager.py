@@ -536,6 +536,23 @@ class ModPackages(object):
             uuids.append(cls.installed[k]['uuid'])
         
         return cls.get_by_uuids(uuids)
+
+    @classmethod
+    def get_removed_packages(cls) -> list[Package]:
+        """
+        Get all recently removed mods
+
+        Returns
+        -------
+        list[Package]
+            List of all mod packages currently installed
+        """
+        uuids = []
+        for k in cls.changed:
+            if cls.changed[k]['new'] is None:
+                uuids.append(k)
+
+        return cls.get_by_uuids(uuids)
     
     @classmethod
     def get_by_uuid(cls, uuid: str) -> Package:
@@ -659,14 +676,18 @@ class ModPackages(object):
                 s = os.path.join(root, f)
                 d = os.path.join(cls.config['gamedir'], s[len(srcdir):])
                 p = os.path.dirname(d)
-                logging.debug('Copying file to ' + d)
+                if os.path.exists(d) and os.path.getmtime(s) == os.path.getmtime(d):
+                    # Compare to see if the file has been modified
+                    logging.debug('Skipping unchanged file ' + d)
+                else:
+                    logging.debug('Copying file to ' + d)
 
-                if not os.path.exists(p):
-                    os.makedirs(p)
-                
-                shutil.copyfile(s, d)
+                    if not os.path.exists(p):
+                        os.makedirs(p)
+
+                    shutil.copy2(s, d)
         
-        # Remove any 'removed' mod, this is important here because testing mods often involves removing ones which don't work
+        # Remove any 'removed' mod
         for r in cls.removed:
             d = os.path.join(cls.config['gamedir'], 'BepInEx', 'plugins', r)
             if os.path.exists(d):

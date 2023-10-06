@@ -2,7 +2,11 @@
 
 ## Overview
 
-This is a script to assist with packaging mods from Thunderstore.io into a zip file for users on private servers so they don't have to hunt down mods themselves.  It will also manage mods for your local game instance for testing prior to deployment.
+Simple command-line application to manage mods for Valheim from Thunderstore.io.
+
+* Manages locally installed mods for testing
+* Provides ZIP export for players
+* Deploys mods to server automatically upon publishing
 
 ![Application UI](docs/images/screenshot-ui.png)
 
@@ -18,16 +22,17 @@ This is a script to assist with packaging mods from Thunderstore.io into a zip f
 (with pip)
 
 ```bash
-pip3 install packaging python-magic
+pip3 install packaging python-magic paramiko
 ````
 
 (with native packages)
 
 ```bash
-sudo apt install python3-packaging python3-magic
+sudo apt install python3-packaging python3-magic python3-paramiko
 ```
 
-Python3 and the [packaging, python-magic] packages.  Tested on Ubuntu 22.04 and Debian 12 with Python 3.11
+Python3 and the [packaging, python-magic, paramiko] packages.
+Tested on Ubuntu 22.04 and Debian 12 with Python 3.11
 
 ## Configuration
 
@@ -52,6 +57,25 @@ Directory to export bundled mods and change information, feel free to set to a d
 ### updatedays
 
 Set the number of days for "updated" packages, setting this to '14' will export any plugin updated in the last 14 days in the "updated" package export
+
+### sftp_host
+
+Set to the IP or hostname to automatically deploy "server" plugins during export.
+if empty, this logic is skipped
+
+### sftp_user
+
+Username to connect with via SSH, (key-based authentication only)
+
+### sftp_path
+
+Path on the dedicated server where Valheim is installed (for auto-deployment)
+
+### override_server
+
+Comma-separated list of plugins to force server deployment
+Usually only mods flagged with the "server" tag are deployed,
+but sometimes mod developers don't include that.
 
 
 ## Using
@@ -113,9 +137,18 @@ Lastly, `Export/Package Mods` will create a variety of files for your users.  A 
 
 ## Server Mods
 
-For mods that are tagged with the `Server-side` flag, they are also copied into `.cache/server` for manual deployment to your private server.  Simply copy these files to your game server when ready.
+For mods that are tagged with the `Server-side` flag, 
+they are also copied into `.cache/server` for deployment to your private server.
+
+If the `sftp_` options are configured, the library will automatically upload
+these mods to your game server upon releasing a new bundle.
+
+For manual deployments, simply copy these files to your game server when ready.
 
 
 ## Technical Notes
 
-This application makes heavy use of file caching.  The full packages list from thunderstore.io is only downloaded once a day and mod packages are stored in `.cache/packages` so repeated installs of the same package do not need to download from the site again.
+This application makes heavy use of file caching. 
+The full packages list from thunderstore.io is only downloaded once an hour (by default)
+and mod packages are stored in `.cache/packages`, so repeated installs 
+of the same package do not need to download from the site again.

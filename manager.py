@@ -5,14 +5,13 @@ import requests
 import time
 import json
 import datetime
-import dateutil.parser
 import re
 import yaml
 import zipfile
 import magic
 import paramiko
 from packaging import version
-
+from dateutil import parser
 
 class PackageVersion:
     """

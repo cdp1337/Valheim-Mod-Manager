@@ -28,7 +28,7 @@ pip3 install packaging python-magic paramiko
 (with native packages)
 
 ```bash
-sudo apt install python3-packaging python3-magic python3-paramiko
+sudo apt install python3-packaging python3-magic python3-paramiko python3-dateutil
 ```
 
 Python3 and the [packaging, python-magic, paramiko] packages.
